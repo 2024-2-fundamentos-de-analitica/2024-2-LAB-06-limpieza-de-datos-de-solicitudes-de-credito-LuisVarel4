@@ -2,8 +2,20 @@
 Escriba el codigo que ejecute la accion solicitada en la pregunta.
 """
 
-import pandas as pd
 import os
+import pandas as pd
+
+
+def clean_text(column):
+    return column.str.lower().str.replace("-", " ").str.replace("_", " ").str.strip()
+
+
+def dates(date_series):
+    dates = pd.to_datetime(date_series, dayfirst=True, errors="coerce")
+    dates = dates.fillna(
+        pd.to_datetime(date_series, format="%Y/%m/%d", errors="coerce")
+    )
+    return dates
 
 
 def pregunta_01():
@@ -17,71 +29,44 @@ def pregunta_01():
 
     """
 
+    input_path = "files/input/solicitudes_de_credito.csv"
+    output_path = "files/output/solicitudes_de_credito.csv"
 
-def load_data(input_file):
+    df = pd.read_csv(input_path, sep=";", index_col=0)
 
-    df = pd.read_csv(input_file, sep=";", index_col=0)
+    df.drop_duplicates(inplace=True)
+    df.dropna(inplace=True)
 
-    return df
-
-
-def text_normalization(dataframe, columna):
-    dataframe[columna] = (
-        dataframe[columna]
-        .str.lower()
-        .str.strip()
-        .str.replace("_", " ")
-        .str.replace("-", " ")
-        .str.replace(",", "")
-        .str.replace(".00", "")
-        .str.replace("$", "")
-        .str.strip()
-    )
-    return dataframe
-
-
-def main(input_file, output_file):
-
-    columnas = [
-        "sexo",
-        "tipo_de_emprendimiento",
+    df["sexo"] = df["sexo"].str.lower()
+    df["tipo_de_emprendimiento"] = df["tipo_de_emprendimiento"].str.lower()
+    df["barrio"] = df["barrio"].str.lower().str.replace("_", " ").str.replace("-", " ")
+    columns = [
         "idea_negocio",
-        "monto_del_credito",
         "línea_credito",
     ]
-    df = load_data(input_file)
+    for column in columns:
+        df[column] = clean_text(df[column])
 
-    for columna in columnas:
-        df = text_normalization(df, columna)
-
-    df["barrio"] = df["barrio"].str.lower().str.replace("_", " ").str.replace("-", " ")
-    df["comuna_ciudadano"] = df["comuna_ciudadano"].astype(int)
-    df["monto_del_credito"] = df["monto_del_credito"].astype(float)
-    df["fecha_de_beneficio"] = pd.to_datetime(
-        df["fecha_de_beneficio"], format="%d/%m/%Y", errors="coerce"
-    ).combine_first(
-        pd.to_datetime(df["fecha_de_beneficio"], format="%Y/%m/%d", errors="coerce")
+    df["monto_del_credito"] = (
+        df["monto_del_credito"]
+        .str.strip()
+        .str.replace("$", "")
+        .str.replace(",", "")
+        .str.replace(".00", "")
+        .astype(int)
     )
+    df["fecha_de_beneficio"] = dates(df["fecha_de_beneficio"])
 
-    df = df.drop_duplicates()
-    df = df.dropna()
+    df.drop_duplicates(inplace=True)
 
-    save_output(df, "solicitudes_de_credito", output_file)
+    if os.path.exists(output_path):
+        os.remove(output_path)
 
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    df.to_csv(output_path, sep=";")
 
-def save_output(dataframe, name, output_directory="files/output"):
-    if not os.path.exists(output_directory):
-        os.makedirs(output_directory)
-
-    dataframe.to_csv(
-        f"{output_directory}/{name}.csv",
-        sep=";",
-        index=False,
-    )
+    print(df["sexo"].value_counts())
+    print(df["barrio"].value_counts())
 
 
-if "__main__" in __name__:
-    main(
-        input_file="files/input/solicitudes_de_credito.csv",
-        output_file="files/output",
-    )
+pregunta_01()
